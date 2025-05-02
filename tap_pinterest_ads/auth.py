@@ -28,11 +28,7 @@ class PinterestAuthenticator(OAuthAuthenticator, metaclass=SingletonMeta):
             auth_endpoint="https://api.pinterest.com/v5/oauth/token",
             oauth_scopes=",".join([
                 "ads:read",
-                "boards:read",
-                "boards:read_secret",
-                "pins:read",
-                "pins:read_secret",
-                "user_accounts:read",
+                "ads:write"
             ])
         )
 
