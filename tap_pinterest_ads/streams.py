@@ -259,6 +259,8 @@ class AdAnalyticsStream(PinterestStream):
             'page_size': 100,
             'ad_ids': context["ad_id"],
         }
+        if self.config.get("attribution_window"):
+            params["attribution_window"] = self.config["attribution_window"]
         self.logger.debug(params)
         return params
 
@@ -270,7 +272,7 @@ class AdAnalyticsStream(PinterestStream):
         """Return a generator of row-type dictionary objects.
         Each row emitted should be a dictionary of property names to their values.
         """
-        if context["ad_status"] != "ACTIVE" and self.config["is_backfilled"] == True:
+        if context["ad_status"] != "ACTIVE" and self.config.get("is_backfilled", False) == True:
             self.logger.info("Skipping inactive ad {ad_id} sync.".format(ad_id=context["ad_id"]))
             return []
         return super().get_records(context)
@@ -353,6 +355,8 @@ class AccountAnalyticsStream(PinterestStream):
             'columns': ','.join(ACCOUNT_ANALYTICS_COLUMNS),
             'page_size': 100,
         }
+        if self.config.get("attribution_window"):
+            params["attribution_window"] = self.config["attribution_window"]
         self.logger.debug(params)
         return params
     

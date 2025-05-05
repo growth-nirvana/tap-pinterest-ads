@@ -58,6 +58,12 @@ class TapPinterestAds(Tap):
             default=False,
             description="Set to True once backfilled in order to reduce API calls per day"
         ),
+        th.Property(
+            "attribution_window",
+            th.StringType,
+            required=False,
+            description="Attribution window for analytics (e.g., '1d_click_1d_view'). See Pinterest API docs for valid values."
+        ),
     ).to_dict()
 
     def discover_streams(self) -> List[Stream]:
