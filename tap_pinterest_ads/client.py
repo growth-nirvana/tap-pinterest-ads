@@ -1,5 +1,6 @@
 """REST client handling, including PinterestStream base class."""
 from typing import Any, Dict, Optional, Iterable, Callable
+import datetime
 
 import backoff
 import requests
@@ -16,6 +17,7 @@ class PinterestStream(RESTStream):
     """pinterest stream class."""
 
     url_base = "https://api.pinterest.com/v5/"
+    run_id = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
 
     records_jsonpath = "$.items[*]"  # Or override `parse_response`.
     next_page_token_jsonpath = "$.bookmark"  # Or override `get_next_page_token`.
@@ -63,7 +65,9 @@ class PinterestStream(RESTStream):
 
     def parse_response(self, response: requests.Response) -> Iterable[dict]:
         """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath(self.records_jsonpath, input=response.json())
+        for record in extract_jsonpath(self.records_jsonpath, input=response.json()):
+            record["run_id"] = self.run_id
+            yield record
 
     def validate_response(self, response: requests.Response) -> None:
         if response.status_code == 429 or 500 <= response.status_code < 600:

@@ -20,12 +20,18 @@ from singer_sdk.typing import (
     StringType,
 )
 
+# Base properties that should be included in all streams
+BASE_PROPERTIES = [
+    Property("run_id", NumberType),
+]
+
 class AdAccountStream(PinterestStream):
     name = 'ad_accounts'
     path = 'ad_accounts'
     primary_keys = ["id"]
     replication_key = None
     schema = PropertiesList(
+        *BASE_PROPERTIES,
         Property("id", StringType),
         Property("name", StringType),
         Property("owner",
@@ -52,6 +58,7 @@ class CampaignStream(PinterestStream):
     primary_keys = ["id"]
     replication_key = None
     schema = PropertiesList(
+        *BASE_PROPERTIES,
         Property("id", StringType),
         Property("ad_account_id", StringType),
         Property("name", StringType),
@@ -83,6 +90,7 @@ class AdGroupStream(PinterestStream):
     primary_keys = ["id"]
     replication_key = None
     schema = PropertiesList(
+        *BASE_PROPERTIES,
         Property("name", StringType),
         Property("status", StringType),
         Property("budget_in_micro_currency", NumberType),
@@ -138,6 +146,7 @@ class AdStream(PinterestStream):
     primary_keys = ["id"]
     replication_key = None
     schema = PropertiesList(
+        *BASE_PROPERTIES,
         Property("ad_group_id", StringType),
         Property("android_deep_link", StringType),
         Property("carousel_android_deep_links", ArrayType(StringType)),
@@ -233,6 +242,7 @@ class AdAnalyticsStream(PinterestStream):
     replication_key = "DATE"
     state_partitioning_keys = ["AD_ID"]
     properties = [
+        *BASE_PROPERTIES,
         Property("AD_ID", StringType),
         Property("DATE", DateTimeType),
     ]
@@ -333,6 +343,7 @@ class AccountAnalyticsStream(PinterestStream):
     primary_keys = ["AD_ACCOUNT_ID", "DATE"]
     replication_key = "DATE"
     properties = [
+        *BASE_PROPERTIES,
         Property("AD_ACCOUNT_ID", StringType),
         Property("DATE", DateTimeType),
     ]
