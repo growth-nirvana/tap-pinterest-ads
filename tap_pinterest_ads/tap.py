@@ -11,7 +11,7 @@ from tap_pinterest_ads.streams import (
     AdGroupStream,
     AdStream,
     AdAnalyticsStream,
-    AccountAnalyticsStream
+    AccountAnalyticsStream,
 )
 STREAM_TYPES = [
     AdAccountStream,
@@ -19,7 +19,7 @@ STREAM_TYPES = [
     AdGroupStream,
     AdStream,
     AdAnalyticsStream,
-    AccountAnalyticsStream
+    AccountAnalyticsStream,
 ]
 
 
