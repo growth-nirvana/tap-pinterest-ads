@@ -48,42 +48,46 @@ class TapPinterestAds(Tap):
         ),
         th.Property(
             "start_date",
-            th.DateTimeType,
+            th.StringType,
             default="2019-10-17T00:00:00Z",
-            description="Date to start collection analytics from"
+            description=(
+                "Date to start collecting analytics from. Accepts YYYY-MM-DD, "
+                "ISO-8601, or MM/DD/YYYY. Synchronous Pinterest analytics only "
+                "return the last 90 days, so older dates are moved forward."
+            ),
+        ),
+        th.Property(
+            "account_ids",
+            th.StringType,
+            required=False,
+            description=(
+                "Optional comma-separated ad account IDs. When omitted, every "
+                "account the token can access is synced."
+            ),
+        ),
+        th.Property(
+            "click_window_days",
+            th.IntegerType,
+            default=30,
+            description="Conversion attribution window in days for a pin click",
+        ),
+        th.Property(
+            "engagement_window_days",
+            th.IntegerType,
+            default=30,
+            description="Conversion attribution window in days for an engagement",
+        ),
+        th.Property(
+            "view_window_days",
+            th.IntegerType,
+            default=1,
+            description="Conversion attribution window in days for a view",
         ),
         th.Property(
             "is_backfilled",
             th.BooleanType,
             default=False,
             description="Set to True once backfilled in order to reduce API calls per day"
-        ),
-        th.Property(
-            "account_ids",
-            th.StringType,
-            required=False,
-            description="Optional comma-separated list of account IDs to sync. If not provided, all accessible accounts will be synced."
-        ),
-        th.Property(
-            "click_window_days",
-            th.IntegerType,
-            required=False,
-            default=30,
-            description="Number of days to use as the conversion attribution window for a pin click action. Applies to Pinterest Tag conversion metrics."
-        ),
-        th.Property(
-            "engagement_window_days",
-            th.IntegerType,
-            required=False,
-            default=30,
-            description="Number of days to use as the conversion attribution window for an engagement action. Engagements include saves, closeups, link clicks, and carousel card swipes."
-        ),
-        th.Property(
-            "view_window_days",
-            th.IntegerType,
-            required=False,
-            default=1,
-            description="Number of days to use as the conversion attribution window for a view action."
         ),
         th.Property(
             "conversion_report_time",
