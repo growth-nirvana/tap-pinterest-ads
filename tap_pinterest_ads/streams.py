@@ -171,7 +171,23 @@ class AdAccountStream(PinterestStream):
             self.logger.warning(f"Some requested accounts were not found: {missing_accounts}")
 
 
-class CampaignStream(PinterestStream):
+# Pinterest lists only ACTIVE and PAUSED entities unless asked. Archived ads
+# still have analytics for the days they ran. Drafts never deliver.
+ENTITY_STATUSES = ["ACTIVE", "PAUSED", "ARCHIVED"]
+
+
+class PinterestEntityStream(PinterestStream):
+    """Campaigns, ad groups and ads, including archived ones."""
+
+    def get_url_params(
+        self, context: Optional[dict], next_page_token: Optional[Any]
+    ) -> Dict[str, Any]:
+        params = super().get_url_params(context, next_page_token)
+        params["entity_statuses"] = ",".join(ENTITY_STATUSES)
+        return params
+
+
+class CampaignStream(PinterestEntityStream):
     name = 'campaigns'
     parent_stream_type = AdAccountStream
     path = "ad_accounts/{ad_account_id}/campaigns"
@@ -203,7 +219,7 @@ class CampaignStream(PinterestStream):
     ).to_dict()
 
 
-class AdGroupStream(PinterestStream):
+class AdGroupStream(PinterestEntityStream):
     name = 'ad_groups'
     parent_stream_type = AdAccountStream
     path = "ad_accounts/{ad_account_id}/ad_groups"
@@ -259,7 +275,7 @@ class AdGroupStream(PinterestStream):
     ).to_dict()
 
 
-class AdStream(PinterestStream):
+class AdStream(PinterestEntityStream):
     name = 'ads'
     parent_stream_type = AdAccountStream
     path = "ad_accounts/{ad_account_id}/ads"
@@ -304,14 +320,6 @@ class AdStream(PinterestStream):
         Property("updated_time", NumberType),
         Property("summary_status", StringType),
     ).to_dict()
-
-    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
-        """Return a context dictionary for child streams."""
-        return {
-            "ad_account_id": record["ad_account_id"],
-            "ad_id": record["id"],
-            "ad_status": record["status"]
-        }
 
 
 AD_ANALYTICS_COLUMNS = [
@@ -449,15 +457,38 @@ class PinterestAnalyticsStream(PinterestStream):
         return None
 
 
+def ads_to_request(ads: Iterable[dict], window_start: datetime.date, skip_inactive: bool) -> list:
+    """Return the ad IDs to pull for a window that starts on window_start.
+
+    When skip_inactive is set, an ad that is not ACTIVE is left out only if it
+    has not changed since the window started: it cannot have delivered in the
+    window. An ad paused during the window is still pulled.
+    """
+    cutoff = datetime.datetime.combine(
+        window_start, datetime.time.min, tzinfo=datetime.timezone.utc
+    ).timestamp()
+    ad_ids = []
+    for ad in ads:
+        if skip_inactive and ad.get("status") != "ACTIVE" and (ad.get("updated_time") or 0) < cutoff:
+            continue
+        ad_ids.append(str(ad["id"]))
+    return ad_ids
+
+
 class AdAnalyticsStream(PinterestAnalyticsStream):
+    """Ad analytics, one bookmark and one date window per ad account.
+
+    Every ad in an account is pulled for the same dates, so a load that replaces
+    the account's date range never removes rows it did not pull again.
+    """
+
     name = 'ad_analytics'
-    parent_stream_type = AdStream
+    parent_stream_type = AdAccountStream
     path = "ad_accounts/{ad_account_id}/ads/analytics"
     records_jsonpath = "$[*]"
     ignore_parent_replication_keys = True
     primary_keys = ["AD_ID", "DATE"]
     replication_key = "DATE"
-    state_partitioning_keys = ["AD_ID"]
     columns = AD_ANALYTICS_COLUMNS
     schema = analytics_schema(
         Property("AD_ID", StringType),
@@ -465,23 +496,53 @@ class AdAnalyticsStream(PinterestAnalyticsStream):
         columns=AD_ANALYTICS_COLUMNS,
     )
 
+    # Pinterest accepts at most 250 ad_ids per analytics request.
+    ad_ids_per_request = 250
+
+    def list_account_ads(self, ad_account_id: str) -> Iterable[dict]:
+        """Yield every ad in the account with its status and updated_time."""
+        url = f"{self.url_base}ad_accounts/{ad_account_id}/ads"
+        params = {"page_size": 100, "entity_statuses": ",".join(ENTITY_STATUSES)}
+        while True:
+            response = self.request_decorator(self._get_ads_page)(url, params)
+            body = response.json()
+            yield from body.get("items", [])
+            bookmark = body.get("bookmark")
+            if not bookmark:
+                return
+            params["bookmark"] = bookmark
+
+    def _get_ads_page(self, url: str, params: dict) -> requests.Response:
+        response = self.requests_session.get(url, params=params, headers=self.http_headers)
+        self.validate_response(response)
+        return response
+
     def get_url_params(
         self, context: Optional[dict], next_page_token: Optional[Any]
     ) -> Optional[dict]:
         params = super().get_url_params(context, next_page_token)
         if params is None:
             return None
-        params["ad_ids"] = context["ad_id"]
+        params["ad_ids"] = ",".join(self._ad_ids_batch)
         return params
 
     def get_records(self, context: Optional[dict] = None) -> Iterable[Dict[str, Any]]:
-        """Return a generator of row-type dictionary objects.
-        Each row emitted should be a dictionary of property names to their values.
-        """
-        if context["ad_status"] != "ACTIVE" and self.config.get("is_backfilled", False) == True:
-            self.logger.info("Skipping inactive ad {ad_id} sync.".format(ad_id=context["ad_id"]))
-            return []
-        return super().get_records(context)
+        bounds = self.analytics_bounds(context, None)
+        if bounds is None:
+            return
+        start_day = bounds[0]
+        ads = list(self.list_account_ads(context["ad_account_id"]))
+        ad_ids = ads_to_request(ads, start_day, bool(self.config.get("is_backfilled", False)))
+        self.logger.info(
+            "ad_analytics account %s: %s of %s ads from %s",
+            context["ad_account_id"],
+            len(ad_ids),
+            len(ads),
+            start_day.isoformat(),
+        )
+        for i in range(0, len(ad_ids), self.ad_ids_per_request):
+            self._ad_ids_batch = ad_ids[i:i + self.ad_ids_per_request]
+            yield from super().get_records(context)
 
 
 ACCOUNT_ANALYTICS_COLUMNS = [

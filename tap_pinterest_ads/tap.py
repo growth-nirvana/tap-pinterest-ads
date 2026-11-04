@@ -87,7 +87,11 @@ class TapPinterestAds(Tap):
             "is_backfilled",
             th.BooleanType,
             default=False,
-            description="Set to True once backfilled in order to reduce API calls per day"
+            description=(
+                "Set to True once backfilled. ad_analytics then leaves out ads "
+                "that are not ACTIVE and have not changed since the sync window "
+                "started."
+            ),
         ),
         th.Property(
             "conversion_report_time",

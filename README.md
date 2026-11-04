@@ -20,11 +20,20 @@ pipx install git+https://github.com/gthesheep/tap-pinterest-ads.git
 - **client_secret**: App secret key
 - **refresh_token**: Refresh token obtained from the OAuth user flow
 - **start_date**: Start date to collect ad analytics from
-- **is_backfilled**: Set to True once backfilled in order to reduce API calls per day
+- **is_backfilled**: Set to True once backfilled. `ad_analytics` then leaves out ads that are not ACTIVE and have not changed since the sync window started, since they cannot have delivered in it
 - **click_window_days**: Number of days to use as the conversion attribution window for a pin click action (default: 30)
 - **engagement_window_days**: Number of days to use as the conversion attribution window for an engagement action (default: 30)
 - **view_window_days**: Number of days to use as the conversion attribution window for a view action (default: 1)
 - **conversion_report_time**: The date by which the conversion metrics will be reported. Can be either TIME_OF_AD_ACTION or TIME_OF_CONVERSION (default: TIME_OF_AD_ACTION)
+
+### Ad analytics
+
+`ad_analytics` keeps one bookmark per ad account and pulls every ad in the
+account for the same dates, up to 250 ads per request. A load that replaces an
+account's date range (for example target-bigquery `filtered_replace` keyed on
+`AD_ACCOUNT_ID`) therefore never removes rows it did not pull again. Campaigns,
+ad groups and ads include archived entities, which still have analytics for the
+days they ran.
 
 A full list of supported settings and capabilities for this
 tap is available by running:
